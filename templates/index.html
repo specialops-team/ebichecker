@@ -4,7 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jotform Catalog Checker</title>
+    <title>EBI Jotform Catalog Checker</title>
+    <meta name="description"
+        content="Upload your Jotform Catalog Excel file to validate ISWC, ISRC, Release Links, and Writer/Publisher shares.">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="icon" href="{{ url_for('static', filename='logo.jpg') }}" type="image/x-icon">
@@ -15,7 +17,7 @@
 
         <header class="flex items-center border-b-2 border-gray-200 pb-4 mb-6">
             <img src="{{ url_for('static', filename='logo.jpg') }}" alt="Logo" class="h-10">
-            <div class="text-3xl font-bold text-blue-600 ml-auto">Jotform Catalog Checker</div>
+            <div class="text-3xl font-bold text-blue-600 ml-auto">EBI Jotform Catalog Checker</div>
         </header>
 
         <section id="panelChecker">
