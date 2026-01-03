@@ -5,225 +5,89 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EBI Jotform Catalog Checker</title>
-    <meta name="description"
-        content="Upload your Jotform Catalog Excel file to validate ISWC, ISRC, Release Links, and Writer/Publisher shares.">
     <script src="https://cdn.tailwindcss.com"></script>
+
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
     <link rel="icon" href="{{ url_for('static', filename='logo.jpg') }}" type="image/x-icon">
 </head>
 
 <body class="bg-gray-100 flex justify-center min-h-screen">
     <div class="container bg-white p-10 rounded-lg shadow-xl w-full max-w-2xl mt-12 mb-12 relative z-0">
-
         <header class="flex items-center border-b-2 border-gray-200 pb-4 mb-6">
             <img src="{{ url_for('static', filename='logo.jpg') }}" alt="Logo" class="h-10">
-            <div class="text-3xl font-bold text-blue-600 ml-auto">EBI Jotform Catalog Checker</div>
+            <div class="text-3xl font-bold text-blue-600 ml-auto">EBI Catalog Checker</div>
         </header>
 
         <section id="panelChecker">
             <h2 class="text-2xl font-semibold mb-6 text-gray-800">Check Catalog for Errors</h2>
-            <p class="mb-4 text-gray-600">
-                Upload your Jotform Catalog Excel file to validate ISWC, ISRC, Release Links, and Writer/Publisher
-                shares.
-            </p>
 
             <form id="checkerForm" enctype="multipart/form-data">
+
                 <div class="mb-5">
-                    <label for="catalog_file" class="font-bold block mb-2 text-gray-700">
-                        Upload JotForm Catalog Excel:
-                    </label>
-                    <input type="file" id="catalog_file" name="catalog_file" accept=".xlsx,.xls" required
-                        class="w-full border-gray-300 rounded-md p-2">
+                    <label for="check_type" class="font-bold block mb-2 text-gray-700">Select Check Type:</label>
+                    <select id="check_type" name="check_type"
+                        class="w-full border border-gray-300 rounded-md p-2 bg-white focus:ring-2 focus:ring-blue-500 outline-none transition">
+                        <option value="ALL IN ONE" selected>ALL IN ONE</option>
+                        <option value="RELEASE INFO">RELEASE INFO</option>
+                        <option value="ISWC">ISWC</option>
+                        <option value="DROPDOWN">DROPDOWN</option>
+                        <option value="CURVE DATA">CURVE DATA</option>
+                    </select>
                 </div>
+
+                <div class="mb-5">
+                    <label for="catalog_file" class="font-bold block mb-2 text-gray-700">Upload Excel File:</label>
+                    <input type="file" id="catalog_file" name="catalog_file" accept=".xlsx,.xls" required
+                        class="w-full border border-gray-300 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+
                 <button type="submit" id="submitBtn"
-                    class="bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-lg text-xl w-full transition duration-300 ease-in-out font-semibold">
+                    class="bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-lg text-xl w-full transition font-semibold shadow-md">
                     Run Checker
                 </button>
             </form>
 
-            <div id="statusMessage" class="status-message mt-6 p-4 rounded-md hidden"></div>
+            <div id="statusMessage" class="hidden mt-6 p-4 rounded-md text-center font-medium"></div>
         </section>
     </div>
 
     <div id="validationModal"
-        class="fixed inset-0 bg-black bg-opacity-60 hidden flex items-center justify-center z-50 p-4">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[80vh]">
+        class="fixed inset-0 bg-black bg-opacity-60 hidden flex items-center justify-center z-50 p-4 transition-opacity duration-300">
+        <div
+            class="bg-white rounded-lg shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col transform transition-all scale-100">
 
-            <div class="p-6 bg-red-50 border-b border-red-100 flex justify-between items-center">
-                <div>
-                    <h3 class="text-xl font-bold text-red-700">Validation Issues Found</h3>
-                    <p class="text-red-600 text-sm mt-1">Review the errors below.</p>
-                </div>
-                <button id="closeIconBtn" class="text-gray-400 hover:text-gray-600">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="flex justify-between items-center p-6 border-b border-gray-200">
+                <h3 class="text-2xl font-bold text-gray-800">Validation Errors</h3>
+                <button id="closeIconBtn" class="text-gray-400 hover:text-gray-600 transition">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12">
                         </path>
                     </svg>
                 </button>
             </div>
 
-            <div class="p-8 overflow-y-auto">
-                <table class="w-full text-left">
+            <div class="p-6 overflow-y-auto flex-grow">
+                <table class="w-full text-left border-collapse">
                     <tbody id="validationTableBody">
                     </tbody>
                 </table>
             </div>
 
-            <div class="p-6 bg-gray-50 border-t flex flex-col items-center gap-4">
+            <div class="p-6 border-t border-gray-200 bg-gray-50 flex justify-center">
                 <button id="downloadErrorsBtn"
-                    class="bg-red-600 hover:bg-red-700 text-white px-10 py-3 rounded-lg font-bold transition shadow-lg w-full max-w-sm flex justify-center items-center gap-2">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded shadow-lg transition flex items-center">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
                     </svg>
-                    Download Error List
+                    Download Excel Report
                 </button>
             </div>
         </div>
     </div>
 
-    <script>
-        document.addEventListener("DOMContentLoaded", () => {
-            const form = document.getElementById("checkerForm");
-            const fileInput = document.getElementById("catalog_file");
-            const submitBtn = document.getElementById("submitBtn");
-            const statusDiv = document.getElementById("statusMessage");
-
-            // Modal Elements
-            const modal = document.getElementById("validationModal");
-            const tableBody = document.getElementById("validationTableBody");
-            const downloadBtn = document.getElementById("downloadErrorsBtn");
-            const closeIconBtn = document.getElementById("closeIconBtn");
-
-            // Variables to hold current state
-            let currentErrors = [];
-            let currentFilename = "";
-
-            // Close Modal Logic
-            function closeModal() {
-                modal.classList.add("hidden");
-            }
-            closeIconBtn.addEventListener("click", closeModal);
-            modal.addEventListener("click", (e) => {
-                if (e.target === modal) closeModal();
-            });
-
-            // Display Errors
-            function showErrors(errors) {
-                tableBody.innerHTML = "";
-                errors.forEach((err) => {
-                    const tr = document.createElement("tr");
-                    tr.className = "border-b border-gray-100 last:border-0";
-                    tr.innerHTML = `
-            <td class="py-3 px-2 align-top w-10">
-                <svg class="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-            </td>
-            <td class="py-3 px-2 text-gray-700 font-medium text-sm leading-6">
-                <span class="font-bold text-gray-900">${err.ID}</span> - 
-                <span class="italic text-gray-600">(${err.Title})</span> - 
-                ${err.Issue}
-            </td>`;
-                    tableBody.appendChild(tr);
-                });
-                modal.classList.remove("hidden");
-            }
-
-            // Handle Download Click
-            downloadBtn.addEventListener("click", async () => {
-                const originalText = downloadBtn.innerHTML;
-                downloadBtn.innerHTML = "Downloading...";
-                downloadBtn.disabled = true;
-
-                try {
-                    const response = await fetch("/download_errors", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                            errors: currentErrors,
-                            filename: currentFilename,
-                        }),
-                    });
-
-                    if (!response.ok) throw new Error("Failed to generate file");
-
-                    const blob = await response.blob();
-                    const url = window.URL.createObjectURL(blob);
-
-                    // Build the name in JS to ensure the browser uses it correctly
-                    const baseName = currentFilename.replace(/\.[^/.]+$/, "");
-                    const dateStr = new Date().toISOString().split("T")[0];
-                    const finalDownloadName = `${baseName} Error Checked ${dateStr}.xlsx`;
-
-                    const a = document.createElement("a");
-                    a.href = url;
-                    a.download = finalDownloadName; // This fixes the UUID filename issue
-                    document.body.appendChild(a);
-                    a.click();
-                    a.remove();
-                    window.URL.revokeObjectURL(url);
-                } catch (error) {
-                    alert("Error downloading file: " + error.message);
-                } finally {
-                    downloadBtn.innerHTML = originalText;
-                    downloadBtn.disabled = false;
-                }
-            });
-
-            // Handle Form Submit
-            form.addEventListener("submit", async (e) => {
-                e.preventDefault();
-                statusDiv.classList.add("hidden");
-                statusDiv.className = "";
-                submitBtn.disabled = true;
-                submitBtn.textContent = "Checking...";
-
-                // Capture filename immediately
-                if (fileInput.files.length > 0) {
-                    currentFilename = fileInput.files[0].name;
-                }
-
-                try {
-                    const formData = new FormData(form);
-                    const response = await fetch("/check_catalog", {
-                        method: "POST",
-                        body: formData,
-                    });
-
-                    const result = await response.json();
-
-                    if (!response.ok) {
-                        throw new Error(result.error || "Unknown error occurred");
-                    }
-
-                    if (result.status === "issues_found") {
-                        currentErrors = result.errors; // Store for download
-                        showErrors(result.errors);
-
-                        statusDiv.classList.remove("hidden");
-                        statusDiv.className =
-                            "status-message mt-6 p-4 rounded-md bg-red-100 text-red-800 border border-red-200";
-                        statusDiv.textContent = `Found ${result.errors.length} issues. Please review and download the report.`;
-                    } else {
-                        statusDiv.classList.remove("hidden");
-                        statusDiv.className =
-                            "status-message mt-6 p-4 rounded-md bg-green-100 text-green-800 border border-green-200";
-                        statusDiv.textContent = result.message;
-                    }
-                } catch (error) {
-                    statusDiv.classList.remove("hidden");
-                    statusDiv.className =
-                        "status-message mt-6 p-4 rounded-md bg-red-100 text-red-800";
-                    statusDiv.textContent = `Error: ${error.message}`;
-                } finally {
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = "Run Checker";
-                }
-            });
-        });
-
-    </script>
+    <script src="{{ url_for('static', filename='js/script.js') }}?v=1"></script>
 </body>
 
 </html>

@@ -1,202 +1,195 @@
 import pandas as pd
-import math
 
-def _norm_str(val):
-    """Normalize string: trim, upper, handle None."""
-    if pd.isna(val) or val is None:
+# IMPORT OLD ALL-IN-ONE CHECKER (AUTHORITATIVE LOGIC)
+from checker_logic_old import validate_catalog_file as old_all_in_one_checker
+
+
+# ---------- COMMON HELPERS ---------- #
+
+def _norm_str(v):
+    if pd.isna(v) or v is None:
         return ""
-    return str(val).strip()
+    return str(v).strip()
 
-def _parse_float(val):
-    """Parse numeric values safely."""
-    if pd.isna(val) or val is None or val == "":
-        return 0.0
+
+def _parse_float(v):
     try:
-        s = str(val).replace("%", "").strip()
-        return float(s)
+        clean = str(v).replace("%", "").strip()
+        return float(clean) if clean else 0.0
     except:
         return 0.0
 
-def _is_empty(val):
-    """Check if value is effectively empty."""
-    return _norm_str(val) == ""
+
+def _is_empty(v):
+    return _norm_str(v) == ""
+
 
 def _find_col(df, keywords):
-    """Find column using fuzzy matching."""
     for col in df.columns:
-        c_upper = str(col).upper().strip()
-        if all(k.upper() in c_upper for k in keywords):
+        name = str(col).upper()
+        if all(k.upper() in name for k in keywords):
             return col
     return None
 
-def validate_catalog_file(file_buffer):
-    # Exclusion List
-    EXCLUSIONS = ["NRY", "NRYI", "YTO", "UATF", "UATFOS"]
-    
+
+# ---------- MODULAR CHECKS ---------- #
+
+def check_iswc_only(row, row_num, col_iswc):
+    errs = []
+    val = _norm_str(row.get(col_iswc))
+    if "." in val or "NOTES" in val.upper():
+        errs.append(f"Row {row_num}: ISWC has dots or Notes")
+    return errs
+
+
+def check_release_info_only(row, row_num, cols):
+    errs = []
+
+    isrc = _norm_str(row.get(cols["isrc"]))
+    rel_link = _norm_str(row.get(cols["rel_link"]))
+
+    if isrc:
+        if _is_empty(row.get(cols["rel_date"])):
+            errs.append(f"Row {row_num}: Recording Release Date (CWR) is missing or not matched")
+        if _is_empty(row.get(cols["rec_title"])):
+            errs.append(f"Row {row_num}: Recording Title is missing or not matched")
+        if _is_empty(row.get(cols["upc"])):
+            errs.append(f"Row {row_num}: Album UPC is missing or not matched")
+        if _is_empty(rel_link):
+            errs.append(f"Row {row_num}: Release Link is missing or not matched")
+
+    if rel_link and not isrc:
+        errs.append(f"Row {row_num}: Recording ISRC is missing or not matched (Required for Release Link)")
+
+    if rel_link and _is_empty(row.get(cols["portal_link"])):
+        errs.append(f"Row {row_num}: PORTAL LINK TO SONG is missing or not matched")
+
+    return errs
+
+
+def check_dropdown_only(row, row_num, df):
+    errs = []
+
+    col_writer_total = _find_col(df, ["WRITER", "TOTAL"])
+    wt_raw = row.get(col_writer_total)
+
+    if _is_empty(wt_raw):
+        errs.append(f"Row {row_num}: Writer Total is missing or not matched")
+        return errs
+
     try:
-        df = pd.read_excel(file_buffer)
-    except Exception as e:
-        return [{"ID": "N/A", "Title": "N/A", "Issue": f"System Error: Could not read Excel file. {str(e)}"}]
+        w_count = int(float(wt_raw))
+    except:
+        errs.append(f"Row {row_num}: Writer Total is not a valid number")
+        return errs
+
+    loop_limit = min(w_count, 20)
+    total_share = 0.0
+
+    for i in range(1, loop_limit + 1):
+        c_share_col = _find_col(df, [f"COMPOSER {i}", "SHARE"])
+        c_ctrl_col = _find_col(df, [f"COMPOSER {i}", "CONTROLLED"])
+        c_cap_col = _find_col(df, [f"COMPOSER {i}", "CAPACITY"])
+        c_link_col = _find_col(df, [f"COMPOSER {i}", "LINKED", "PUBLISHER"])
+
+        p_name_col = _find_col(df, [f"PUBLISHER {i}", "NAME"])
+        p_cae_col = _find_col(df, [f"PUBLISHER {i}", "CAE"])
+        p_aff_col = _find_col(df, [f"PUBLISHER {i}", "AFFILIATION"])
+        p_cap_col = _find_col(df, [f"PUBLISHER {i}", "CAPACITY"])
+        p_share_col = _find_col(df, [f"PUBLISHER {i}", "SHARE"])
+
+        raw_share = row.get(c_share_col)
+        if _is_empty(raw_share):
+            errs.append(f"Row {row_num}: Composer {i} Share is missing or not matched")
+            share_val = 0.0
+        else:
+            share_val = _parse_float(raw_share)
+
+        total_share += share_val
+
+        if _norm_str(row.get(c_ctrl_col)).upper() not in ["Y", "N"]:
+            errs.append(f"Row {row_num}: Composer {i} Controlled is missing or not matched")
+
+        if _norm_str(row.get(c_cap_col)).upper() not in ["A", "C", "AC", "CA"]:
+            errs.append(f"Row {row_num}: Composer {i} Capacity is missing or not matched")
+
+        link_val = _norm_str(row.get(c_link_col))
+        if not link_val:
+            errs.append(f"Row {row_num}: Composer {i} Linked Publisher is missing or not matched")
+
+        pub_name = _norm_str(row.get(p_name_col)).upper()
+        pub_cae = _norm_str(row.get(p_cae_col)).replace(".0", "")
+        pub_aff = _norm_str(row.get(p_aff_col)).upper()
+
+        if link_val.upper() == "ELITE EMBASSY PUBLISHING":
+            if pub_name != "ELITE EMBASSY PUBLISHING":
+                errs.append(f"Row {row_num}: Publisher {i} Name is missing or not matched")
+            if pub_cae != "619851030":
+                errs.append(f"Row {row_num}: Publisher {i} CAE No is missing or not matched")
+            if pub_aff != "BMI":
+                errs.append(f"Row {row_num}: Publisher {i} Affiliation is missing or not matched")
+
+        if _norm_str(row.get(p_cap_col)).upper() != "OP":
+            errs.append(f"Row {row_num}: Publisher {i} Capacity is missing or not matched (Should be OP)")
+
+        pub_share = _parse_float(row.get(p_share_col))
+        if _is_empty(row.get(p_share_col)) or abs(pub_share - share_val) > 0.01:
+            errs.append(f"Row {row_num}: Publisher {i} Share does not match Composer {i} Share")
+
+    if abs(total_share - 100.0) > 0.1:
+        errs.append(f"Row {row_num}: Total Share is not 100%")
+
+    return errs
+
+
+# ---------- MAIN ENTRY POINT ---------- #
+
+def validate_catalog_file(file_buffer, check_mode="ALL IN ONE"):
+    """
+    ALL IN ONE  -> delegates to old checker (NO BEHAVIOR CHANGE)
+    Others      -> modular checks only
+    """
+
+    if check_mode == "ALL IN ONE":
+        return old_all_in_one_checker(file_buffer)
+
+    df = pd.read_excel(file_buffer)
+
+    cols = {
+        "catalog": _find_col(df, ["EEP", "CATALOG"]),
+        "title": _find_col(df, ["TITLE"]),
+        "iswc": _find_col(df, ["ISWC"]),
+        "isrc": _find_col(df, ["RECORDING", "ISRC"]),
+        "rel_date": _find_col(df, ["RELEASE", "DATE", "CWR"]),
+        "rec_title": _find_col(df, ["RECORDING", "TITLE"]),
+        "upc": _find_col(df, ["ALBUM", "UPC"]),
+        "rel_link": _find_col(df, ["RELEASE", "LINK"]),
+        "portal_link": _find_col(df, ["PORTAL", "LINK"]),
+    }
 
     errors = []
 
-    # --- Identify Columns (Fuzzy Search) ---
-    col_catalog = _find_col(df, ["EEP", "MASTER", "CATALOG"])
-    col_title = _find_col(df, ["TITLE"])
-    col_iswc = _find_col(df, ["ISWC"])
-    
-    # Release Details Columns
-    col_isrc = _find_col(df, ["RECORDING", "ISRC"])
-    col_release_date = _find_col(df, ["RECORDING", "RELEASE", "DATE", "CWR"])
-    col_rec_title = _find_col(df, ["RECORDING", "TITLE"])
-    col_upc = _find_col(df, ["ALBUM", "UPC"])
-    col_release_link = _find_col(df, ["RELEASE", "LINK"])
-    col_portal_link = _find_col(df, ["PORTAL", "LINK"])
-    
-    col_writer_total = _find_col(df, ["WRITER", "TOTAL"])
-
     for idx, row in df.iterrows():
-        row_num = idx + 2 # Excel Row Number
-        
-        # --- Identification Data ---
-        cat_val = _norm_str(row.get(col_catalog)) if col_catalog else "Unknown ID"
-        title_val = _norm_str(row.get(col_title)) if col_title else "Unknown Title"
-        
-        def add_err(msg):
+        row_num = idx + 2
+        cid = _norm_str(row.get(cols["catalog"])) or "Unknown ID"
+        title = _norm_str(row.get(cols["title"])) or "Unknown Title"
+
+        issues = []
+
+        if check_mode == "ISWC" and cols["iswc"]:
+            issues += check_iswc_only(row, row_num, cols["iswc"])
+
+        if check_mode == "RELEASE INFO":
+            issues += check_release_info_only(row, row_num, cols)
+
+        if check_mode == "DROPDOWN":
+            issues += check_dropdown_only(row, row_num, df)
+
+        for msg in issues:
             errors.append({
-                "ID": cat_val,
-                "Title": title_val,
-                "Issue": f"Row {row_num}: {msg}"
+                "ID": cid,
+                "Title": title,
+                "Issue": msg
             })
-
-        # --- Exclusion Check Helper ---
-        def is_excluded(val):
-            val_norm = _norm_str(val).upper()
-            return any(exc in val_norm for exc in EXCLUSIONS)
-
-        # --- ISWC Check ---
-        if col_iswc:
-            iswc_val = _norm_str(row.get(col_iswc))
-            if not is_excluded(iswc_val):
-                if "." in iswc_val or "NOTES" in iswc_val.upper():
-                    add_err("ISWC has dots or Notes")
-
-        # --- ISRC & Release Details ---
-        isrc_val = _norm_str(row.get(col_isrc)) if col_isrc else ""
-        rec_title_val = _norm_str(row.get(col_rec_title)) if col_rec_title else ""
-        rel_link_val = _norm_str(row.get(col_release_link)) if col_release_link else ""
-
-        has_isrc = not _is_empty(isrc_val)
-        has_rel_link = not _is_empty(rel_link_val)
-
-        # Rule: If ISRC is available -> Check Song Release Details
-        # Skip these if ISRC, Rec Title, or Release Link contains an exclusion
-        if has_isrc and not any(is_excluded(v) for v in [isrc_val, rec_title_val, rel_link_val]):
-            if col_release_date and _is_empty(row.get(col_release_date)):
-                add_err("Recording Release Date (CWR) is missing or not matched")
-            
-            if col_rec_title and _is_empty(row.get(col_rec_title)):
-                add_err("Recording Title is missing or not matched")
-
-            if col_upc and _is_empty(row.get(col_upc)):
-                add_err("Album UPC is missing or not matched")
-
-            if col_release_link and _is_empty(rel_link_val):
-                add_err("Release Link is missing or not matched")
-
-        # Rule: Release Link Logic (Skip if exclusion found)
-        if has_rel_link and not is_excluded(rel_link_val):
-            if not has_isrc:
-                 add_err("Recording ISRC is missing or not matched (Required for Release Link)")
-            
-            if col_portal_link and _is_empty(row.get(col_portal_link)):
-                add_err("PORTAL LINK TO SONG is missing or not matched")
-
-        # --- Writers Section ---
-        # (Writers logic remains strict as per original code unless specified otherwise)
-        total_share = 0.0
-        w_total_val = row.get(col_writer_total) if col_writer_total else 0
-        w_count = 0
-        
-        if _is_empty(w_total_val):
-            add_err("Writer Total is missing or not matched")
-        else:
-            try:
-                w_count = int(float(w_total_val))
-            except:
-                 add_err("Writer Total is not a valid number")
-
-        loop_limit = min(w_count, 20)
-        
-        for i in range(1, loop_limit + 1):
-            c_share_col = _find_col(df, [f"COMPOSER {i}", "SHARE"])
-            c_ctrl_col = _find_col(df, [f"COMPOSER {i}", "CONTROLLED"])
-            c_cap_col = _find_col(df, [f"COMPOSER {i}", "CAPACITY"])
-            c_link_pub_col = _find_col(df, [f"COMPOSER {i}", "LINKED", "PUBLISHER"])
-            
-            p_name_col = _find_col(df, [f"PUBLISHER {i}", "NAME"])
-            p_cae_col = _find_col(df, [f"PUBLISHER {i}", "CAE"])
-            p_aff_col = _find_col(df, [f"PUBLISHER {i}", "AFFILIATION"])
-            p_cap_col_fixed = _find_col(df, [f"PUBLISHER {i}", "CAPACITY"])
-            p_share_col = _find_col(df, [f"PUBLISHER {i}", "SHARE"])
-
-            c_share_raw = row.get(c_share_col) if c_share_col else None
-            c_share_val = 0.0
-            
-            if _is_empty(c_share_raw):
-                 add_err(f"Composer {i} Share is missing or not matched")
-            else:
-                c_share_val = _parse_float(c_share_raw)
-            
-            total_share += c_share_val
-
-            c_ctrl_val = _norm_str(row.get(c_ctrl_col)).upper() if c_ctrl_col else ""
-            if c_ctrl_val not in ["Y", "N"]:
-                add_err(f"Composer {i} Controlled is missing or not matched")
-
-            c_cap_val = _norm_str(row.get(c_cap_col)).upper() if c_cap_col else ""
-            if c_cap_val not in ["A", "C", "AC", "CA"]:
-                add_err(f"Composer {i} Capacity is missing or not matched")
-
-            link_pub_val = _norm_str(row.get(c_link_pub_col)) if c_link_pub_col else ""
-            if link_pub_val == "":
-                add_err(f"Composer {i} Linked Publisher is missing or not matched")
-            
-            is_elite = link_pub_val.upper() == "ELITE EMBASSY PUBLISHING"
-            is_music_emb = link_pub_val.upper() == "MUSIC EMBASSIES PUBLISHING"
-
-            if is_elite:
-                if _norm_str(row.get(p_name_col)).upper() != "ELITE EMBASSY PUBLISHING":
-                    add_err(f"Publisher {i} Name is missing or not matched")
-                p_cae_val = _norm_str(row.get(p_cae_col)).replace(".0", "")
-                if p_cae_val != "619851030":
-                     add_err(f"Publisher {i} CAE No is missing or not matched")
-                if _norm_str(row.get(p_aff_col)).upper() != "BMI":
-                    add_err(f"Publisher {i} Affiliation is missing or not matched")
-            
-            elif is_music_emb:
-                if _norm_str(row.get(p_name_col)).upper() != "MUSIC EMBASSIES PUBLISHING":
-                    add_err(f"Publisher {i} Name is missing or not matched")
-                p_cae_val = _norm_str(row.get(p_cae_col)).replace(".0", "")
-                if p_cae_val != "741593140":
-                     add_err(f"Publisher {i} CAE No is missing or not matched")
-                if _norm_str(row.get(p_aff_col)).upper() != "ASCAP":
-                    add_err(f"Publisher {i} Affiliation is missing or not matched")
-
-            p_cap_val = _norm_str(row.get(p_cap_col_fixed)).upper() if p_cap_col_fixed else ""
-            if p_cap_val != "OP":
-                add_err(f"Publisher {i} Capacity is missing or not matched (Should be OP)")
-
-            p_share_raw = row.get(p_share_col) if p_share_col else 0
-            if _is_empty(p_share_raw):
-                add_err(f"Publisher {i} Share is missing or not matched")
-            else:
-                p_share_val = _parse_float(p_share_raw)
-                if abs(p_share_val - c_share_val) > 0.01:
-                    add_err(f"Publisher {i} Share does not match Composer {i} Share")
-
-        if w_count > 0:
-            if abs(total_share - 100.0) > 0.1:
-                 add_err(f"Total Share is not 100% (Found {total_share}%)")
 
     return errors
