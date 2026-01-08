@@ -45,8 +45,10 @@ def download_errors():
         "Title": "Title",
         "Issue": "Issues"
     })
+    
+    df["Status"] = ""
 
-    df = df[["EEP Master Catalog Number", "Title", "Issues"]]
+    df = df[["Status", "EEP Master Catalog Number", "Title", "Issues"]]
 
     base = os.path.splitext(original_filename)[0]
     date = datetime.now().strftime("%Y-%m-%d")
