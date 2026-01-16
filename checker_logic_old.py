@@ -50,7 +50,7 @@ def validate_catalog_file(file_buffer):
     col_release_date = _find_col(df, ["RECORDING", "RELEASE", "DATE", "CWR"])
     col_rec_title = _find_col(df, ["RECORDING", "TITLE"])
     col_upc = _find_col(df, ["ALBUM", "UPC"])
-    col_release_link = _find_col(df, ["RELEASE", "LINK"])
+    col_release_link = next((c for c in df.columns if str(c).upper().strip() == "RELEASE LINK"), None)
     col_portal_link = _find_col(df, ["PORTAL", "LINK"])
     
     col_writer_total = _find_col(df, ["WRITER", "TOTAL"])

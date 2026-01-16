@@ -163,7 +163,7 @@ def validate_catalog_file(file_buffer, check_mode="ALL IN ONE"):
         "rel_date": _find_col(df, ["RELEASE", "DATE", "CWR"]),
         "rec_title": _find_col(df, ["RECORDING", "TITLE"]),
         "upc": _find_col(df, ["ALBUM", "UPC"]),
-        "rel_link": _find_col(df, ["RELEASE", "LINK"]),
+        "rel_link": next((c for c in df.columns if str(c).upper().strip() == "RELEASE LINK"), None),
         "portal_link": _find_col(df, ["PORTAL", "LINK"]),
     }
 
