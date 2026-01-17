@@ -34,6 +34,48 @@ def _find_col(df, keywords):
 
 # ---------- MODULAR CHECKS ---------- #
 
+def check_multiline_metadata(row, row_num, df):
+    """
+    Validates Alternate Title lines against AKA {i} 
+    and Artist(s) lines against Recording Display Artist {i}
+    """
+    errs = []
+
+    # 1. Validation for Alternate Title -> AKA 1, AKA 2...
+    col_alt_source = _find_col(df, ["ALTERNATE", "TITLE"])
+    if col_alt_source:
+        raw_val = _norm_str(row.get(col_alt_source))
+        if raw_val:
+            # Split by newline and remove empty lines
+            lines = [line.strip() for line in raw_val.split('\n') if line.strip()]
+            for i, line_text in enumerate(lines, 1):
+                # Search specifically for "AKA" and the index number
+                col_aka = _find_col(df, ["AKA", str(i)])
+                if col_aka:
+                    aka_val = _norm_str(row.get(col_aka))
+                    if aka_val.upper() != line_text.upper():
+                        errs.append(f"Row {row_num}: Alternate Title line {i} does not match {col_aka}")
+                else:
+                    errs.append(f"Row {row_num}: Column 'AKA {i}' not found to match Alternate Title line {i}")
+
+    # 2. Validation for Artist(s) -> Recording Display Artist 1, 2...
+    col_art_source = _find_col(df, ["ARTIST(S)"])
+    if col_art_source:
+        raw_val = _norm_str(row.get(col_art_source))
+        if raw_val:
+            lines = [line.strip() for line in raw_val.split('\n') if line.strip()]
+            for i, line_text in enumerate(lines, 1):
+                col_art_target = _find_col(df, ["RECORDING", "DISPLAY", "ARTIST", str(i)])
+                if col_art_target:
+                    target_val = _norm_str(row.get(col_art_target))
+                    if target_val.upper() != line_text.upper():
+                        errs.append(f"Row {row_num}: Artist line {i} does not match {col_art_target}")
+                else:
+                    errs.append(f"Row {row_num}: Column 'Recording Display Artist {i}' not found to match Artist line {i}")
+
+    return errs
+
+
 def check_iswc_only(row, row_num, col_iswc):
     errs = []
     val = _norm_str(row.get(col_iswc))
@@ -145,12 +187,10 @@ def check_dropdown_only(row, row_num, df):
 # ---------- MAIN ENTRY POINT ---------- #
 
 def validate_catalog_file(file_buffer, check_mode="ALL IN ONE"):
-    """
-    ALL IN ONE  -> delegates to old checker (NO BEHAVIOR CHANGE)
-    Others      -> modular checks only
-    """
 
     if check_mode == "ALL IN ONE":
+        # Note: You might want to update the old checker too if you want 
+        # these new rules to appear in 'ALL IN ONE' mode.
         return old_all_in_one_checker(file_buffer)
 
     df = pd.read_excel(file_buffer)
@@ -184,6 +224,10 @@ def validate_catalog_file(file_buffer, check_mode="ALL IN ONE"):
 
         if check_mode == "DROPDOWN":
             issues += check_dropdown_only(row, row_num, df)
+            
+        # ADDED: New metadata mode
+        if check_mode == "METADATA":
+            issues += check_multiline_metadata(row, row_num, df)
 
         for msg in issues:
             errors.append({

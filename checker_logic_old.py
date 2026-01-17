@@ -198,5 +198,33 @@ def validate_catalog_file(file_buffer):
         if w_count > 0:
             if abs(total_share - 100.0) > 0.1:
                  add_err(f"Total Share is not 100% (Found {total_share}%)")
+                 
+        # Alternate Title Check
+        col_alt_source = _find_col(df, ["ALTERNATE", "TITLE"])
+        if col_alt_source:
+            alt_raw = _norm_str(row.get(col_alt_source))
+            if alt_raw:
+                alt_lines = [l.strip() for l in alt_raw.split('\n') if l.strip()]
+                for i, line in enumerate(alt_lines, 1):
+                    col_aka = _find_col(df, ["AKA", str(i)])
+                    if col_aka:
+                        if _norm_str(row.get(col_aka)).upper() != line.upper():
+                            add_err(f"AKA {i} does not match Alternate Title line {i}")
+                    else:
+                        add_err(f"Column AKA {i} missing for Alternate Title line {i}")
+
+        # Artist(s) Check
+        col_art_source = _find_col(df, ["ARTIST(S)"])
+        if col_art_source:
+            art_raw = _norm_str(row.get(col_art_source))
+            if art_raw:
+                art_lines = [l.strip() for l in art_raw.split('\n') if l.strip()]
+                for i, line in enumerate(art_lines, 1):
+                    col_target = _find_col(df, ["RECORDING", "DISPLAY", "ARTIST", str(i)])
+                    if col_target:
+                        if _norm_str(row.get(col_target)).upper() != line.upper():
+                            add_err(f"Recording Display Artist {i} does not match Artist line {i}")
+                    else:
+                        add_err(f"Column Recording Display Artist {i} missing for Artist line {i}")
 
     return errors

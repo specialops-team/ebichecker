@@ -26,12 +26,13 @@
 
                 <div class="mb-5">
                     <label for="check_type" class="font-bold block mb-2 text-gray-700">Select Check Type:</label>
-                    <select id="check_type" name="check_type"
-                        class="w-full border border-gray-300 rounded-md p-2 bg-white focus:ring-2 focus:ring-blue-500 outline-none transition">
-                        <option value="ALL IN ONE" selected>ALL IN ONE</option>
-                        <option value="RELEASE INFO">RELEASE INFO</option>
-                        <option value="ISWC">ISWC</option>
-                        <option value="DROPDOWN">DROPDOWN</option>
+                    <select name="check_type" id="check_type"
+                        class="w-full p-3 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-blue-500 transition">
+                        <option value="ALL IN ONE">ALL IN ONE (Comprehensive)</option>
+                        <option value="METADATA">Alternate Title & Artist(s)</option>
+                        <option value="ISWC">ISWC Only</option>
+                        <option value="RELEASE INFO">Release Info Only</option>
+                        <option value="DROPDOWN">Dropdown / Shares Only</option>
                     </select>
                 </div>
 
